@@ -747,3 +747,4 @@ process.on("SIGTERM", async () => {
   await cleanupBrowsers();
   process.exit();
 });
+
