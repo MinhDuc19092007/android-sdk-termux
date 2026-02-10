@@ -1,0 +1,20 @@
+{
+  "master_key": {
+    "name": "Master Key",
+    "max_requests": -1,
+    "max_duration": 86400,
+    "allowed_options": ["--reset", "--debug", "--randpath", "--close", "--browser"],
+    "enabled": true,
+    "created_at": "2024-01-01T00:00:00.000Z"
+  },
+  "vtan_key": {
+    "name": "Limited Key",
+    "max_requests": 100,
+    "max_duration": 300,
+    "allowed_options": ["--reset", "--debug", "--randpath", "--close", "--browser"],
+    "enabled": true,
+    "created_at": "2024-01-01T00:00:00.000Z",
+    "used_requests": 0,
+    "last_reset": "2026-02-10T00:00:00.000Z"
+  }
+}
