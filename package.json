@@ -1,0 +1,17 @@
+{
+  "name": "mduc-flood-api",
+  "version": "1.0.0",
+  "description": "MDUC-FLOOD API - Advanced Flooding Tool",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "docker:build": "docker build -t mduc-flood-api .",
+    "docker:run": "docker run -p 3000:3000 mduc-flood-api"
+  },
+  "keywords": ["mduc", "flood", "api", "ddos", "stress-test"],
+  "author": "MDUC",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
