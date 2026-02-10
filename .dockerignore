@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.DS_Store
+.git
+.gitignore
+.vscode
+.idea
+*.md
+test
+coverage
+.env
+docker-compose.yml
+data/              # Không copy data folder
+apikey.json        # Không copy apikey.json (sẽ tạo tự động)
+create-apikey.js   # Không copy file tạo key
