@@ -1,16 +1,22 @@
 {
+n
+{
   "master_key": {
-    "name": "Master Key",
+    "name": "MDUC Master (Owner)",
     "max_requests": -1,
     "max_duration": 86400,
-    "allowed_options": ["--reset", "--debug", "--randpath", "--close", "--browser"],
+    "max_concurrent_attacks": -1,
+    "allowed_options": ["--reset", "--debug", "--randpath", "--close", "--browser", "--browser=1", "--browser=2", "--browser=3", "--browser=4", "--browser=5"],
     "enabled": true,
-    "created_at": "2024-01-01T00:00:00.000Z"
+    "created_at": "2024-01-01T00:00:00.000Z",
+    "is_owner": true,
+    "last_reset": "2026-02-10T00:00:00.000Z"
   },
   "vtan_key": {
     "name": "Limited Key",
     "max_requests": 100,
     "max_duration": 300,
+    "max_concurrent_attacks": 10,
     "allowed_options": ["--reset", "--debug", "--randpath", "--close", "--browser"],
     "enabled": true,
     "created_at": "2024-01-01T00:00:00.000Z",
