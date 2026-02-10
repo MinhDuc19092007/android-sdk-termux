@@ -20,6 +20,23 @@ const activeAttacks = new Map(); // Lưu trữ các cuộc tấn công đang ch�
 const apiKeyUsage = new Map(); // Theo dõi sử dụng API key
 const rateLimits = new Map(); // Rate limiting
 
+// ==================== HÀM TIỆN ÍCH ====================
+
+// Hàm sinh API key ngẫu nhiên
+function generateApiKey() {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substr(2, 8); // 8 ký tự ngẫu nhiên
+  return `key_${timestamp}_${randomStr}`;
+}
+
+// Format thời gian
+function formatDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${h}h ${m}m ${s}s`;
+}
+
 // Đọc API keys từ file
 function loadApiKeys() {
   try {
@@ -34,22 +51,23 @@ function loadApiKeys() {
   // Tạo file mẫu nếu không tồn tại
   const sampleKeys = {
     "master_key": {
-      "name": "Master Key",
-      "max_requests": -1, // -1 = không giới hạn
-      "max_duration": 86400, // Thời gian tối đa mỗi request (giây)
-      "allowed_options": ["--reset", "--debug", "--randpath", "--close", "--browser"],
+      "name": "Master Key (Owner)",
+      "max_requests": -1,
+      "max_duration": 86400,
+      "allowed_options": ["--reset", "--debug", "--randpath", "--close", "--browser", "--browser=1", "--browser=2", "--browser=3", "--browser=4", "--browser=5"],
       "enabled": true,
-      "created_at": new Date().toISOString()
+      "created_at": new Date().toISOString(),
+      "is_owner": true
     },
-    "limited_key": {
-      "name": "Limited Key",
+    "key_1739123456789_abc123xyz": {
+      "name": "Example User",
       "max_requests": 100,
-      "max_duration": 300, // 5 phút
+      "max_duration": 300,
       "allowed_options": ["--reset", "--debug"],
       "enabled": true,
       "created_at": new Date().toISOString(),
       "used_requests": 0,
-      "last_reset": new Date().toISOString()
+      "last_reset": "2026-02-10T00:00:00.000Z"
     }
   };
   
@@ -75,10 +93,99 @@ function saveApiKeys(apiKeys) {
       JSON.stringify(apiKeys, null, 2),
       'utf8'
     );
+    return true;
   } catch (error) {
     console.error("Lỗi lưu file API key:", error);
+    return false;
   }
 }
+
+// Parse arguments với hỗ trợ quotes (giữ từ bot cũ)
+function parseArgs(str) {
+  const args = [];
+  let current = "";
+  let inQuotes = false;
+  let quoteChar = "";
+
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+
+    if ((char === '"' || char === "'") && !inQuotes) {
+      inQuotes = true;
+      quoteChar = char;
+    } else if (char === quoteChar && inQuotes) {
+      inQuotes = false;
+      quoteChar = "";
+    } else if (char === " " && !inQuotes) {
+      if (current.trim()) {
+        args.push(current.trim());
+      }
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  if (current.trim()) {
+    args.push(current.trim());
+  }
+
+  return args;
+}
+
+// Kiểm tra options có được phép không
+function validateOptions(providedOptions, allowedOptions) {
+  if (!providedOptions || providedOptions.length === 0) {
+    return { valid: true, invalidOptions: [] };
+  }
+  
+  const invalidOptions = [];
+  const allowedOptionsSet = new Set(allowedOptions);
+  
+  for (const option of providedOptions) {
+    let isValid = false;
+    
+    // Kiểm tra option đơn giản (--name)
+    if (allowedOptionsSet.has(option)) {
+      isValid = true;
+    } 
+    // Kiểm tra option có giá trị (--name=value)
+    else if (option.includes('=')) {
+      const [optionName, optionValue] = option.split('=');
+      
+      // Kiểm tra nếu cho phép tất cả giá trị (--browser=*)
+      if (allowedOptionsSet.has(`${optionName}=*`)) {
+        isValid = true;
+      }
+      // Kiểm tra giá trị cụ thể
+      else if (allowedOptionsSet.has(option)) {
+        isValid = true;
+      }
+      // Kiểm tra giá trị số trong khoảng cho phép
+      else if (optionName === "--browser" && !isNaN(optionValue)) {
+        const value = parseInt(optionValue);
+        // Cho phép --browser=1 đến --browser=5
+        for (let i = 1; i <= 5; i++) {
+          if (allowedOptionsSet.has(`${optionName}=${i}`)) {
+            isValid = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (!isValid) {
+      invalidOptions.push(option);
+    }
+  }
+  
+  return {
+    valid: invalidOptions.length === 0,
+    invalidOptions
+  };
+}
+
+// ==================== MIDDLEWARE ====================
 
 // Middleware kiểm tra API key với rate limiting
 function checkApiKey(req, res, next) {
@@ -148,8 +255,8 @@ function checkApiKey(req, res, next) {
   rateLimit.count++;
   rateLimit.lastRequest = now;
   
-  // Kiểm tra số lượng request tối đa
-  if (keyInfo.max_requests !== -1) {
+  // Kiểm tra số lượng request tối đa (chỉ với key không phải master)
+  if (apiKey !== "master_key" && keyInfo.max_requests !== -1) {
     if (!keyInfo.used_requests) {
       keyInfo.used_requests = 0;
     }
@@ -186,77 +293,7 @@ function checkApiKey(req, res, next) {
   next();
 }
 
-// Format thời gian
-function formatDuration(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return `${h}h ${m}m ${s}s`;
-}
-
-// Kiểm tra options có được phép không
-function validateOptions(providedOptions, allowedOptions) {
-  if (!providedOptions || providedOptions.length === 0) {
-    return { valid: true, invalidOptions: [] };
-  }
-  
-  const invalidOptions = [];
-  
-  for (const option of providedOptions) {
-    // Kiểm tra options có dạng --name=value hoặc --name
-    const optionName = option.split('=')[0];
-    let isValid = false;
-    
-    for (const allowedOption of allowedOptions) {
-      if (allowedOption === optionName) {
-        isValid = true;
-        break;
-      }
-    }
-    
-    if (!isValid) {
-      invalidOptions.push(option);
-    }
-  }
-  
-  return {
-    valid: invalidOptions.length === 0,
-    invalidOptions
-  };
-}
-
-// Parse arguments với hỗ trợ quotes (giữ từ bot cũ)
-function parseArgs(str) {
-  const args = [];
-  let current = "";
-  let inQuotes = false;
-  let quoteChar = "";
-
-  for (let i = 0; i < str.length; i++) {
-    const char = str[i];
-
-    if ((char === '"' || char === "'") && !inQuotes) {
-      inQuotes = true;
-      quoteChar = char;
-    } else if (char === quoteChar && inQuotes) {
-      inQuotes = false;
-      quoteChar = "";
-    } else if (char === " " && !inQuotes) {
-      if (current.trim()) {
-        args.push(current.trim());
-      }
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-
-  if (current.trim()) {
-    args.push(current.trim());
-  }
-
-  return args;
-}
+// ==================== API ROUTES ====================
 
 // API chính
 app.get("/", (req, res) => {
@@ -269,7 +306,8 @@ app.get("/", (req, res) => {
       "Rate limiting thông minh",
       "Giới hạn request/ngày",
       "Kiểm soát thời gian tấn công",
-      "Filter options theo API Key"
+      "Filter options theo API Key",
+      "Auto proxy scraper"
     ],
     endpoints: {
       start: "POST /api/flood",
@@ -278,7 +316,13 @@ app.get("/", (req, res) => {
       proxy: "GET /api/proxy",
       update_proxy: "GET /api/proxy/update",
       keys: "GET /api/keys",
+      keys_all: "GET /api/keys/all (master only)",
       create_key: "POST /api/keys",
+      update_key: "POST /api/keys/update",
+      set_reset_date: "POST /api/keys/set-reset-date",
+      set_date_all: "POST /api/keys/set-date-all",
+      toggle_options: "POST /api/keys/toggle-options",
+      remove_option: "POST /api/keys/remove-option",
       system: "GET /api/system",
       help: "GET /api/help"
     }
@@ -307,21 +351,21 @@ app.get("/api/help", checkApiKey, (req, res) => {
         threads: "Số luồng (1-100) - Bắt buộc",
         ratelimit: "Giới hạn request/giây (>=1) - Bắt buộc",
         proxy_file: "File proxy (tùy chọn, mặc định: proxy.txt)",
-        options: `Mảng các tùy chọn - Chỉ được phép: ${keyInfo.allowed_options.join(', ')}`
+        options: `Mảng các tùy chọn - Chỉ được phép: ${keyInfo.allowed_options.join(', ') || 'Không có options nào được phép'}`
       },
       example: {
         target: "https://target.com",
         time: 120,
         threads: 10,
         ratelimit: 90,
-        options: ["--reset", "--debug"]
+        options: keyInfo.allowed_options.length > 0 ? [keyInfo.allowed_options[0]] : []
       }
     }
   });
 });
 
 // API Bắt đầu tấn công
-app.post("/api/flood", checkApiKey, async (req, res) => {
+app.post("/api/flood", checkApiKey, (req, res) => {
   const { target, time, threads, ratelimit, proxy_file, options = [] } = req.body;
   const keyInfo = req.apiKeyInfo;
   const apiKey = req.apiKeyValue;
@@ -405,9 +449,9 @@ app.post("/api/flood", checkApiKey, async (req, res) => {
     });
   }
   
-  // Tăng số lượng request đã sử dụng
+  // Tăng số lượng request đã sử dụng (trừ master key)
   const apiKeys = loadApiKeys();
-  if (apiKeys[apiKey]) {
+  if (apiKey !== "master_key" && apiKeys[apiKey]) {
     if (!apiKeys[apiKey].used_requests) {
       apiKeys[apiKey].used_requests = 0;
     }
@@ -514,10 +558,11 @@ app.post("/api/flood", checkApiKey, async (req, res) => {
     success: true,
     message: "Bắt đầu tấn công thành công",
     attack_id: attackId,
-    api_key_usage: {
+    api_key_usage: apiKey !== "master_key" ? {
       used_today: apiKeys[apiKey]?.used_requests || 0,
-      max_per_day: apiKeys[apiKey]?.max_requests || "unlimited"
-    },
+      max_per_day: apiKeys[apiKey]?.max_requests || "unlimited",
+      remaining: apiKeys[apiKey]?.max_requests === -1 ? "unlimited" : (apiKeys[apiKey]?.max_requests - (apiKeys[apiKey]?.used_requests || 0))
+    } : null,
     details: {
       target,
       time: formatDuration(time),
@@ -685,20 +730,27 @@ app.get("/api/status", checkApiKey, (req, res) => {
   }
 });
 
-// API Quản lý API Keys
+// API Quản lý API Keys - Xem key của mình
 app.get("/api/keys", checkApiKey, (req, res) => {
   const apiKey = req.apiKeyValue;
   const apiKeys = loadApiKeys();
   
-  // Chỉ hiển thị thông tin key của chính mình
   if (apiKeys[apiKey]) {
     const keyInfo = { ...apiKeys[apiKey] };
-    // Ẩn thông tin nhạy cảm nếu cần
-    delete keyInfo.created_at;
     
     res.json({
       success: true,
-      your_key: keyInfo
+      your_key: {
+        api_key: apiKey,
+        name: keyInfo.name,
+        max_requests: keyInfo.max_requests,
+        max_duration: keyInfo.max_duration,
+        allowed_options: keyInfo.allowed_options,
+        enabled: keyInfo.enabled,
+        used_requests: keyInfo.used_requests || 0,
+        last_reset: keyInfo.last_reset,
+        created_at: keyInfo.created_at
+      }
     });
   } else {
     res.status(404).json({
@@ -708,10 +760,9 @@ app.get("/api/keys", checkApiKey, (req, res) => {
   }
 });
 
-// API Tạo API Key mới (chỉ cho admin/master key)
+// API Tạo API Key mới (chỉ cho master key)
 app.post("/api/keys", checkApiKey, (req, res) => {
   const apiKey = req.apiKeyValue;
-  const apiKeys = loadApiKeys();
   const { name, max_requests, max_duration, allowed_options } = req.body;
   
   // Chỉ master key mới có quyền tạo key mới
@@ -730,17 +781,19 @@ app.post("/api/keys", checkApiKey, (req, res) => {
   }
   
   // Tạo key mới
-  const newKey = `key_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+  const newKey = generateApiKey();
+  const apiKeys = loadApiKeys();
   
   apiKeys[newKey] = {
     name: name,
     max_requests: max_requests || 50,
-    max_duration: max_duration || 600, // 10 phút mặc định
+    max_duration: max_duration || 600,
     allowed_options: allowed_options || ["--reset", "--debug"],
     enabled: true,
     created_at: new Date().toISOString(),
     created_by: apiKey,
-    used_requests: 0
+    used_requests: 0,
+    last_reset: new Date().toISOString()
   };
   
   saveApiKeys(apiKeys);
@@ -749,8 +802,318 @@ app.post("/api/keys", checkApiKey, (req, res) => {
     success: true,
     message: "Đã tạo API key mới",
     api_key: newKey,
-    key_info: apiKeys[newKey]
+    key_info: apiKeys[newKey],
+    warning: "⚠️ Lưu API key này ngay! Nó chỉ hiển thị một lần duy nhất.",
+    note: "Sử dụng api_key này trong header X-API-Key hoặc query parameter api_key"
   });
+});
+
+// API Xem tất cả keys (chỉ master)
+app.get("/api/keys/all", checkApiKey, (req, res) => {
+  const apiKey = req.apiKeyValue;
+  
+  if (apiKey !== "master_key") {
+    return res.status(403).json({
+      success: false,
+      message: "Chỉ master key mới có quyền xem tất cả keys"
+    });
+  }
+  
+  const apiKeys = loadApiKeys();
+  const keysList = [];
+  
+  Object.keys(apiKeys).forEach(key => {
+    if (key !== "master_key") { // Không hiển thị master key
+      keysList.push({
+        api_key: key,
+        name: apiKeys[key].name,
+        max_requests: apiKeys[key].max_requests,
+        used_requests: apiKeys[key].used_requests || 0,
+        max_duration: apiKeys[key].max_duration,
+        allowed_options: apiKeys[key].allowed_options,
+        enabled: apiKeys[key].enabled,
+        created_at: apiKeys[key].created_at,
+        last_reset: apiKeys[key].last_reset,
+        last_used: apiKeys[key].last_used || "Chưa dùng"
+      });
+    }
+  });
+  
+  res.json({
+    success: true,
+    total_keys: keysList.length,
+    keys: keysList
+  });
+});
+
+// API Chỉnh sửa/cập nhật API Key (chỉ master key)
+app.post("/api/keys/update", checkApiKey, (req, res) => {
+  const apiKey = req.apiKeyValue;
+  const { target_key, updates } = req.body;
+  
+  // Chỉ master key mới có quyền chỉnh sửa
+  if (apiKey !== "master_key") {
+    return res.status(403).json({
+      success: false,
+      message: "Chỉ master key mới có quyền chỉnh sửa API keys"
+    });
+  }
+  
+  if (!target_key || !updates) {
+    return res.status(400).json({
+      success: false,
+      message: "Thiếu target_key hoặc updates"
+    });
+  }
+  
+  const apiKeys = loadApiKeys();
+  
+  if (!apiKeys[target_key]) {
+    return res.status(404).json({
+      success: false,
+      message: "Không tìm thấy API key cần chỉnh sửa"
+    });
+  }
+  
+  // Cập nhật thông tin
+  Object.keys(updates).forEach(key => {
+    if (key !== "api_key" && key !== "created_at") {
+      apiKeys[target_key][key] = updates[key];
+    }
+  });
+  
+  saveApiKeys(apiKeys);
+  
+  res.json({
+    success: true,
+    message: `Đã cập nhật API key: ${target_key}`,
+    updated_key: apiKeys[target_key]
+  });
+});
+
+// API Set custom last_reset cho specific key
+app.post("/api/keys/set-reset-date", checkApiKey, (req, res) => {
+  const apiKey = req.apiKeyValue;
+  const { target_key, reset_date, reset_requests = true } = req.body;
+  
+  // Chỉ master key mới có quyền
+  if (apiKey !== "master_key") {
+    return res.status(403).json({
+      success: false,
+      message: "Chỉ master key mới có quyền đặt reset date"
+    });
+  }
+  
+  if (!target_key || !reset_date) {
+    return res.status(400).json({
+      success: false,
+      message: "Thiếu target_key hoặc reset_date"
+    });
+  }
+  
+  // Validate date format
+  const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+  if (!dateRegex.test(reset_date)) {
+    return res.status(400).json({
+      success: false,
+      message: "Date format không đúng. Phải là: YYYY-MM-DDTHH:mm:ss.sssZ",
+      example: "2026-02-10T00:00:00.000Z"
+    });
+  }
+  
+  const apiKeys = loadApiKeys();
+  
+  if (!apiKeys[target_key]) {
+    return res.status(404).json({
+      success: false,
+      message: "Không tìm thấy API key"
+    });
+  }
+  
+  // Cập nhật
+  apiKeys[target_key].last_reset = reset_date;
+  
+  if (reset_requests) {
+    apiKeys[target_key].used_requests = 0;
+  }
+  
+  saveApiKeys(apiKeys);
+  
+  res.json({
+    success: true,
+    message: `Đã cập nhật last_reset cho ${target_key}`,
+    key_info: {
+      name: apiKeys[target_key].name,
+      last_reset: apiKeys[target_key].last_reset,
+      used_requests: apiKeys[target_key].used_requests
+    }
+  });
+});
+
+// API Set date cho tất cả keys
+app.post("/api/keys/set-date-all", checkApiKey, (req, res) => {
+  const apiKey = req.apiKeyValue;
+  const { reset_date, reset_requests = true } = req.body;
+  
+  // Chỉ master key
+  if (apiKey !== "master_key") {
+    return res.status(403).json({
+      success: false,
+      message: "Chỉ master key mới có quyền"
+    });
+  }
+  
+  const targetDate = reset_date || "2026-02-10T00:00:00.000Z";
+  const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+  
+  if (!dateRegex.test(targetDate)) {
+    return res.status(400).json({
+      success: false,
+      message: "Date format không đúng",
+      required_format: "YYYY-MM-DDTHH:mm:ss.sssZ",
+      example: "2026-02-10T00:00:00.000Z"
+    });
+  }
+  
+  const apiKeys = loadApiKeys();
+  const results = [];
+  let updatedCount = 0;
+  
+  Object.keys(apiKeys).forEach(key => {
+    const keyInfo = apiKeys[key];
+    const before = {
+      last_reset: keyInfo.last_reset,
+      used_requests: keyInfo.used_requests || 0
+    };
+    
+    keyInfo.last_reset = targetDate;
+    
+    if (reset_requests) {
+      keyInfo.used_requests = 0;
+    }
+    
+    updatedCount++;
+    results.push({
+      key: key,
+      name: keyInfo.name,
+      before: before,
+      after: {
+        last_reset: keyInfo.last_reset,
+        used_requests: keyInfo.used_requests || 0
+      }
+    });
+  });
+  
+  saveApiKeys(apiKeys);
+  
+  res.json({
+    success: true,
+    message: `Đã cập nhật ${updatedCount} keys về date: ${targetDate}`,
+    reset_date: targetDate,
+    reset_requests: reset_requests,
+    updated_count: updatedCount,
+    results: results
+  });
+});
+
+// API để tắt/bật options cho key
+app.post("/api/keys/toggle-options", checkApiKey, (req, res) => {
+  const apiKey = req.apiKeyValue;
+  const { target_key, disable_all_options = false, allowed_options } = req.body;
+  
+  // Chỉ master key
+  if (apiKey !== "master_key") {
+    return res.status(403).json({
+      success: false,
+      message: "Chỉ master key mới có quyền thay đổi options"
+    });
+  }
+  
+  if (!target_key) {
+    return res.status(400).json({
+      success: false,
+      message: "Thiếu target_key"
+    });
+  }
+  
+  const apiKeys = loadApiKeys();
+  
+  if (!apiKeys[target_key]) {
+    return res.status(404).json({
+      success: false,
+      message: "Không tìm thấy API key"
+    });
+  }
+  
+  if (disable_all_options) {
+    // TẮT tất cả options
+    apiKeys[target_key].allowed_options = [];
+    apiKeys[target_key].note = "Đã tắt tất cả options";
+  } else if (allowed_options && Array.isArray(allowed_options)) {
+    // Set options cụ thể
+    apiKeys[target_key].allowed_options = allowed_options;
+  }
+  
+  saveApiKeys(apiKeys);
+  
+  res.json({
+    success: true,
+    message: `Đã cập nhật options cho ${target_key}`,
+    key_info: {
+      name: apiKeys[target_key].name,
+      allowed_options: apiKeys[target_key].allowed_options,
+      max_duration: apiKeys[target_key].max_duration,
+      max_requests: apiKeys[target_key].max_requests
+    }
+  });
+});
+
+// API để xóa một option khỏi key
+app.post("/api/keys/remove-option", checkApiKey, (req, res) => {
+  const apiKey = req.apiKeyValue;
+  const { target_key, option_to_remove } = req.body;
+  
+  if (apiKey !== "master_key") {
+    return res.status(403).json({
+      success: false,
+      message: "Chỉ master key"
+    });
+  }
+  
+  if (!target_key || !option_to_remove) {
+    return res.status(400).json({
+      success: false,
+      message: "Thiếu target_key hoặc option_to_remove"
+    });
+  }
+  
+  const apiKeys = loadApiKeys();
+  
+  if (!apiKeys[target_key]) {
+    return res.status(404).json({
+      success: false,
+      message: "Không tìm thấy API key"
+    });
+  }
+  
+  // Xóa option khỏi danh sách
+  const index = apiKeys[target_key].allowed_options.indexOf(option_to_remove);
+  if (index !== -1) {
+    apiKeys[target_key].allowed_options.splice(index, 1);
+    saveApiKeys(apiKeys);
+    
+    res.json({
+      success: true,
+      message: `Đã xóa option '${option_to_remove}' khỏi ${target_key}`,
+      remaining_options: apiKeys[target_key].allowed_options
+    });
+  } else {
+    res.json({
+      success: false,
+      message: `Option '${option_to_remove}' không tồn tại trong key`,
+      current_options: apiKeys[target_key].allowed_options
+    });
+  }
 });
 
 // API Xem proxy
@@ -876,10 +1239,14 @@ app.get("/api/system", checkApiKey, (req, res) => {
       max_duration: keyInfo.max_duration,
       max_requests: keyInfo.max_requests,
       used_requests: keyInfo.used_requests || 0,
-      allowed_options: keyInfo.allowed_options || []
+      remaining_requests: keyInfo.max_requests === -1 ? "unlimited" : (keyInfo.max_requests - (keyInfo.used_requests || 0)),
+      allowed_options: keyInfo.allowed_options || [],
+      last_reset: keyInfo.last_reset
     }
   });
 });
+
+// ==================== TỰ ĐỘNG SCRAPER ====================
 
 // Tự động chạy proxy scraper
 function startProxyScraper() {
@@ -907,16 +1274,20 @@ function startProxyScraper() {
   setInterval(runScraper, 30 * 60 * 1000);
 }
 
-// Khởi động server
+// ==================== KHỞI ĐỘNG SERVER ====================
+
 const server = app.listen(PORT, () => {
   console.log(`🚀 API Server đã khởi động trên port ${PORT}`);
   console.log(`📌 Truy cập: http://localhost:${PORT}`);
-  console.log(`🔐 Đã tải ${Object.keys(loadApiKeys()).length} API keys`);
+  console.log(`🔐 Master key: master_key`);
+  console.log(`📊 Đã tải ${Object.keys(loadApiKeys()).length} API keys`);
+  console.log(`🔄 Auto proxy scraper: Enabled (30 phút/lần)`);
   
   startProxyScraper();
 });
 
-// Xử lý shutdown
+// ==================== XỬ LÝ SHUTDOWN ====================
+
 process.on("SIGINT", () => {
   console.log("\n🛑 Đang dừng tất cả cuộc tấn công...");
   
@@ -934,4 +1305,15 @@ process.on("SIGINT", () => {
   server.close(() => {
     process.exit(0);
   });
+});
+
+// ==================== XỬ LÝ LỖI ====================
+
+process.on("uncaughtException", (err) => {
+  console.error("❌ Uncaught Exception:", err.message);
+  console.error(err.stack);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
 });
