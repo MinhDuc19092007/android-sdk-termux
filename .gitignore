@@ -1,0 +1,7 @@
+node_modules/
+npm-debug.log*
+data/
+.env
+.DS_Store
+apikey.json        # Không commit file API keys
+proxy.txt          # Không commit proxy list
