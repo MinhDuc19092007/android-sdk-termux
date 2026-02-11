@@ -1,24 +1,16 @@
 {
-  "master_key": {
-    "name": "MDUC Master (Owner)",
-    "max_requests": -1,
-    "max_duration": 86400,
-    "max_concurrent_attacks": -1,
-    "allowed_options": ["--reset", "--debug", "--randpath", "--close", "--browser", "--browser=1", "--browser=2", "--browser=3", "--browser=4", "--browser=5"],
-    "enabled": true,
-    "created_at": "2024-01-01T00:00:00.000Z",
-    "is_owner": true,
-    "last_reset": "2026-02-10T00:00:00.000Z"
-  },
-  "vtan_key": {
-    "name": "Limited Key",
-    "max_requests": 100,
-    "max_duration": 300,
-    "max_concurrent_attacks": 5,
-    "allowed_options": ["--reset", "--debug", "--randpath", "--close", "--browser"],
-    "enabled": true,
-    "created_at": "2024-01-01T00:00:00.000Z",
-    "used_requests": 0,
-    "last_reset": "2026-02-10T00:00:00.000Z"
+  "owner_key": "YOUR_SECRET_OWNER_KEY_HERE",
+  "api_keys": {},
+  "settings": {
+    "app_name": "MDuc Flood API",
+    "version": "2.0.0",
+    "default_max_time": 120,
+    "default_max_threads": 10,
+    "default_max_rate": 90,
+    "default_max_concurrent": 3,
+    "default_daily_limit": 50,
+    "default_max_browsers": 5,
+    "proxy_file": "proxy.txt",
+    "allowed_browser_options": ["--browser", "--randpath", "--reset", "--debug", "--close"]
   }
 }
