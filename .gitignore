@@ -1,7 +1,42 @@
+# Dependencies
 node_modules/
 npm-debug.log*
-data/
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Runtime data
+logs/
+*.log
+pids/
+*.pid
+*.seed
+
+# Coverage directory
+coverage/
+
+# Secrets
+apikey.json
+proxy.txt
+*.pem
+*.key
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
 .DS_Store
-apikey.json        # Không commit file API keys
-proxy.txt          # Không commit proxy list
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
