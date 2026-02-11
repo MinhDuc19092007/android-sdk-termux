@@ -12,7 +12,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 8080;
 const KEY_FILE = "apikey.json";
 const PROXY_FILE = "proxy.txt";
-const ADMIN_PASSWORD = "mduc_secret_password"; // Mật khẩu để gọi các lệnh Admin
+const ADMIN_PASSWORD = "Mduc2007@"; // Mật khẩu để gọi các lệnh Admin
 const activeAttacks = new Map();
 
 // --- HELPER FUNCTIONS ---
