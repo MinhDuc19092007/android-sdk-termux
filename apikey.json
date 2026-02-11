@@ -1,16 +1,16 @@
 {
-  "owner_key": "YOUR_SECRET_OWNER_KEY_HERE",
-  "api_keys": {},
-  "settings": {
-    "app_name": "MDuc Flood API",
-    "version": "2.0.0",
-    "default_max_time": 120,
-    "default_max_threads": 10,
-    "default_max_rate": 90,
-    "default_max_concurrent": 3,
-    "default_daily_limit": 50,
-    "default_max_browsers": 5,
-    "proxy_file": "proxy.txt",
-    "allowed_browser_options": ["--browser", "--randpath", "--reset", "--debug", "--close"]
-  }
+  "keys": [
+    {
+      "key": "mduc_admin_123",
+      "owner": "Admin",
+      "max_duration": 300,
+      "max_threads": 50,
+      "max_ratelimit": 100,
+      "daily_limit": 100,
+      "max_concurrent": 2,
+      "allowed_options": ["--reset", "--randpath", "--browser", "--close", "--debug"],
+      "usage_today": 0,
+      "last_reset_date": "2026-02-11"
+    }
+  ]
 }
